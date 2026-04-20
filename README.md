@@ -2,6 +2,8 @@
 
 Sketch.ai adalah proyek web sederhana yang dapat mengubah gambar sketsa kasar yang kamu buat di kanvas menjadi gambar berkualitas tinggi dan siap produksi. Aplikasi ini menggunakan model **Google Gemini (GenAI)** untuk memproses sketsa dan *prompt* (instruksi teks) yang kamu berikan.
 
+<img width="1182" height="855" alt="image" src="https://github.com/user-attachments/assets/119c5c9f-57f8-4565-8a76-ca18d47ea25f" />
+
 ---
 
 ## 🚀 Fitur
