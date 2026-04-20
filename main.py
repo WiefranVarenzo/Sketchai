@@ -4,6 +4,11 @@ from pydantic import BaseModel
 from google import genai
 from google.genai import types
 import base64
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 app = FastAPI()
 
 # --- TAMBAHKAN BLOK CORS INI ---
@@ -15,8 +20,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 # Inisialisasi Client AI Studio
-# Ganti dengan API Key milikmu, atau gunakan environment variable GEMINI_API_KEY
-client = genai.Client(api_key="AIzaSyDGSeU47gc_TVkvE8GxoxlvCITAlIJ5JFs")
+# API Key sekarang diambil dari file .env untuk keamanan
+api_key = os.getenv("GEMINI_API_KEY")
+if not api_key:
+    raise RuntimeError("GEMINI_API_KEY tidak ditemukan. Pastikan file .env sudah diisi sesuai .env.example")
+
+client = genai.Client(api_key=api_key)
 
 # Struktur data dari frontend
 class SketchRequest(BaseModel):

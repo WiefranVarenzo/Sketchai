@@ -45,6 +45,15 @@ pip install -r requirements.txt
 ```
 *Note: Ini akan menginstal framework seperti FastAPI, Uvicorn, dan library Google GenAI secara otomatis.*
 
+### 4. Konfigurasi API Key (.env)
+Agar aman, API Key tidak disimpan langsung di dalam kode. 
+1. Buat file baru bernama `.env` di _root_ proyek (selevel dengan `main.py`).
+2. Kamu bisa melihat contoh formatnya di file `.env.example`.
+3. Isi `.env` dengan Google Gemini API Key milikmu:
+```env
+GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxx
+```
+
 ---
 
 ## ▶️ Cara Menjalankan Aplikasi
@@ -69,4 +78,4 @@ Cukup buka file `index.html` menggunakan browser favoritmu (Chrome, Firefox, Saf
 ---
 
 ## ⚠️ Catatan Penting
-- **API Key**: Proyek ini membutuhkan API Key dari Google AI Studio. Pastikan untuk mengganti API Key pada file `main.py` di bagian `client = genai.Client(api_key="...")` dengan API Key milikmu sendiri agar fitur AI dapat berjalan dengan sempurna. Sangat disarankan untuk menggunakan _Environment Variables_ untuk menyimpan API Key agar lebih aman.
+- **API Key**: Proyek ini membutuhkan API Key dari Google AI Studio. Pastikan kamu sudah menaruh API Key milikmu ke dalam file `.env` (lihat langkah 4). Karena kita sudah menggunakan `.env`, kodenya jauh lebih aman dan API Key-mu tidak akan bocor ke GitHub.
