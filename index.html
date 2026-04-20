@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Sketch to Image</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .panel {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        canvas {
+            border: 2px solid #ccc;
+            cursor: crosshair;
+            border-radius: 4px;
+        }
+        .controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #aaa;
+            cursor: not-allowed;
+        }
+        #resultImage {
+            max-width: 512px;
+            max-height: 512px;
+            border: 2px dashed #ccc;
+            border-radius: 4px;
+            display: none; /* Sembunyikan sampai gambar selesai di-generate */
+        }
+    </style>
+</head>
+<body>
+
+    <h1>AI Sketch to Image</h1>
+
+    <div class="container">
+        <div class="panel">
+            <h3>Kanvas Gambar</h3>
+            <canvas id="sketchCanvas" width="512" height="512"></canvas>
+            
+            <div class="controls">
+                <button onclick="clearCanvas()">Hapus Kanvas</button>
+                <input type="color" id="colorPicker" value="#000000">
+                <input type="range" id="brushSize" min="1" max="20" value="5">
+            </div>
+
+            <input type="text" id="promptInput" placeholder="Contoh: Jadikan mobil sport cyberpunk 3D yang realistis">
+            
+            <div style="margin-top: 15px;">
+                <button id="generateBtn" onclick="generateImage()">Generate AI Image</button>
+            </div>
+        </div>
+
+        <div class="panel" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 512px;">
+            <h3>Hasil Generation</h3>
+            <span id="loadingText" style="display: none; color: #007bff; font-weight: bold;">AI sedang berpikir... (bisa butuh beberapa detik)</span>
+            <img id="resultImage" alt="Hasil AI akan muncul di sini">
+        </div>
+    </div>
+
+    <script>
+        // --- LOGIKA KANVAS GAMBAR ---
+        const canvas = document.getElementById('sketchCanvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+
+        // Isi kanvas dengan warna putih agar AI tidak membaca background transparan menjadi hitam
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Event listener untuk mouse
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+
+        function startDrawing(e) {
+            isDrawing = true;
+            draw(e);
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            ctx.lineWidth = document.getElementById('brushSize').value;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = document.getElementById('colorPicker').value;
+
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+            ctx.beginPath();
+        }
+
+        function clearCanvas() {
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('resultImage').style.display = 'none';
+        }
+
+        // --- LOGIKA MENGIRIM KE BACKEND FASTAPI ---
+        async function generateImage() {
+            const prompt = document.getElementById('promptInput').value;
+            const generateBtn = document.getElementById('generateBtn');
+            const loadingText = document.getElementById('loadingText');
+            const resultImage = document.getElementById('resultImage');
+
+            if (!prompt) {
+                alert("Masukkan instruksi prompt terlebih dahulu!");
+                return;
+            }
+
+            // 1. Ambil gambar dari kanvas sebagai Base64
+            const base64Image = canvas.toDataURL('image/png');
+
+            // 2. Ubah status UI menjadi Loading
+            generateBtn.disabled = true;
+            loadingText.style.display = 'block';
+            resultImage.style.display = 'none';
+
+            try {
+                // 3. Kirim POST request ke FastAPI Backend-mu
+                const response = await fetch('http://127.0.0.1:8000/api/generate-from-sketch', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        image: base64Image,
+                        prompt: prompt
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error("Gagal mengambil respons dari server");
+                }
+
+                const data = await response.json();
+
+                // 4. Tampilkan gambar balasan dari AI
+                if (data.status === "success") {
+                    resultImage.src = data.generated_image;
+                    resultImage.style.display = 'block';
+                }
+
+            } catch (error) {
+                console.error("Error:", error);
+                alert("Terjadi kesalahan! Pastikan server FastAPI sedang berjalan.");
+            } finally {
+                // 5. Kembalikan status UI
+                generateBtn.disabled = false;
+                loadingText.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
