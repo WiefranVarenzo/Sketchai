@@ -19,7 +19,7 @@ Fitur unggulan lainnya adalah **Animation Frame Generator**, di mana AI dapat me
 
 ---
 
-## Cara Instalasi & Menjalankan Aplikasi
+## 🚀 Cara Instalasi & Menjalankan Aplikasi
 
 Ikuti panduan di bawah ini untuk menjalankan aplikasi secara lokal di komputer Anda.
 
@@ -77,16 +77,15 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 ### 7. Akses Aplikasi
-Buka web browser favorit Anda (Google Chrome direkomendasikan) dan kunjungi:
- **http://127.0.0.1:8000**
+Buka web browser favorit Anda (Google Chrome direkomendasikan) dan kunjungi: **http://127.0.0.1:8000**
 
 ---
 
-## Tips & Troubleshooting
+## 🛠️ Tips & Troubleshooting
 
 - **Server tidak bisa dinyalakan?** Pastikan *virtual environment* Anda aktif (biasanya ada teks `(myenv)` di awal baris terminal).
 - **Error API Key?** Pastikan Anda telah mengedit file `.env` dengan format yang benar tanpa tanda kutip di sekitar kuncinya.
-- **Ingin mencoba Custom Animation?** Klik tombol "🎬 Generate Animation Frames", pilih opsi "✨ Custom" di bagian bawah, dan ketik instruksi animasi Anda (contoh: *"karakter melakukan sihir bola api"*).
+- **Ingin mencoba Custom Animation?** Klik tombol "🎬 Generate Animation Frames", pilih opsi "Custom" di bagian bawah, dan ketik instruksi animasi Anda (contoh: *"karakter melakukan sihir bola api"*).
 
 ---
 *Dibuat untuk memenuhi proyek Sistem Multimedia dan Eksplorasi Generative AI.*
