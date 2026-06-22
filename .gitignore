@@ -1,4 +1,13 @@
-__pycache__/
+# Environments
 myenv/
+env/
+venv/
 .env
-*.pyc
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+# OS files
+.DS_Store
+Thumbs.db

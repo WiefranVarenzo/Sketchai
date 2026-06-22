@@ -1,204 +1,1164 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Sketch to Image</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
-        }
-        .container {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        .panel {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        canvas {
-            border: 2px solid #ccc;
-            cursor: crosshair;
-            border-radius: 4px;
-        }
-        .controls {
-            margin-top: 10px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        input[type="text"] {
-            width: 100%;
-            padding: 10px;
-            margin-top: 10px;
-            box-sizing: border-box;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        button {
-            padding: 10px 15px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        button:disabled {
-            background-color: #aaa;
-            cursor: not-allowed;
-        }
-        #resultImage {
-            max-width: 512px;
-            max-height: 512px;
-            border: 2px dashed #ccc;
-            border-radius: 4px;
-            display: none; /* Sembunyikan sampai gambar selesai di-generate */
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sketchAI — 2D Game Asset Generator</title>
+<meta name="description" content="Generate game-ready 2D assets from rough sketches using AI. Transparent PNG, grid-sized sprites, sprite sheet export.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0d0f1a;
+  --bg2: #13162a;
+  --bg3: #1a1f35;
+  --surface: rgba(255,255,255,0.04);
+  --surface2: rgba(255,255,255,0.08);
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(139,92,246,0.3);
+  --accent: #8b5cf6;
+  --accent2: #a78bfa;
+  --accent3: #6d28d9;
+  --green: #10b981;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --text: #f1f5f9;
+  --text2: #94a3b8;
+  --text3: #64748b;
+  --radius: 12px;
+  --radius2: 8px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--accent3);border-radius:3px}
+
+/* NAV */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--border);background:rgba(13,15,26,0.95);backdrop-filter:blur(20px);position:sticky;top:0;z-index:100}
+.nav-logo{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;background:linear-gradient(135deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-badge{background:linear-gradient(135deg,var(--accent),#3b82f6);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:1px;text-transform:uppercase}
+.nav-right{display:flex;align-items:center;gap:12px}
+.api-status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+
+/* MAIN LAYOUT */
+.main{display:grid;grid-template-columns:1fr 340px;gap:0;height:calc(100vh - 61px)}
+
+/* LEFT PANEL */
+.left{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow-y:auto}
+.canvas-area{padding:24px;flex:1}
+.canvas-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.canvas-title{font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:1px}
+.canvas-tools{display:flex;align-items:center;gap:8px}
+.tool-btn{background:var(--surface);border:1px solid var(--border);color:var(--text2);padding:6px 12px;border-radius:var(--radius2);font-size:12px;cursor:pointer;transition:all .2s;font-family:inherit}
+.tool-btn:hover{background:var(--surface2);color:var(--text);border-color:var(--accent)}
+.tool-btn.active{background:rgba(139,92,246,0.2);border-color:var(--accent);color:var(--accent2)}
+.canvas-wrap{position:relative;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);background:#fff;cursor:crosshair;margin-bottom:16px;box-shadow:0 0 40px rgba(139,92,246,0.1)}
+#sketchCanvas{display:block;width:100%;height:auto}
+.brush-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brush-ctrl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)}
+input[type=range]{-webkit-appearance:none;height:4px;background:var(--surface2);border-radius:2px;outline:none;width:80px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent2);cursor:pointer}
+input[type=color]{width:28px;height:28px;border:none;border-radius:50%;cursor:pointer;padding:0;background:none}
+.upload-btn{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px dashed var(--border2);color:var(--text2);padding:8px 16px;border-radius:var(--radius2);font-size:12px;cursor:pointer;transition:all .2s;font-family:inherit;width:100%;justify-content:center;margin-top:8px}
+.upload-btn:hover{background:rgba(139,92,246,0.1);color:var(--accent2)}
+
+/* RIGHT PANEL */
+.right{display:flex;flex-direction:column;overflow-y:auto;background:var(--bg2)}
+.right-section{padding:20px;border-bottom:1px solid var(--border)}
+.section-label{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:14px}
+
+/* STYLE PRESETS */
+.style-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.style-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);padding:10px 12px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.style-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--accent),transparent);opacity:0;transition:.2s}
+.style-card:hover{border-color:var(--accent);transform:translateY(-1px)}
+.style-card.selected{border-color:var(--accent);background:rgba(139,92,246,0.12)}
+.style-card.selected::before{opacity:0.05}
+.style-name{font-size:12px;font-weight:600;color:var(--text);position:relative}
+.style-emoji{font-size:18px;margin-bottom:4px;display:block}
+
+/* ASSET TYPE */
+.type-row{display:flex;gap:6px;flex-wrap:wrap}
+.type-btn{flex:1;min-width:fit-content;background:var(--surface);border:1px solid var(--border);color:var(--text2);padding:8px 10px;border-radius:var(--radius2);font-size:11px;font-weight:500;cursor:pointer;transition:all .2s;font-family:inherit;text-align:center}
+.type-btn:hover{border-color:var(--accent);color:var(--accent2)}
+.type-btn.selected{background:rgba(139,92,246,0.15);border-color:var(--accent);color:var(--accent2)}
+
+/* SIZE PICKER */
+.size-row{display:flex;gap:6px}
+.size-btn{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text2);padding:8px 4px;border-radius:var(--radius2);font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;text-align:center}
+.size-btn:hover{border-color:var(--accent);color:var(--accent2)}
+.size-btn.selected{background:rgba(139,92,246,0.15);border-color:var(--accent);color:var(--accent2)}
+
+/* PROMPT INPUT */
+.prompt-input{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:var(--radius2);font-size:13px;font-family:inherit;resize:none;outline:none;transition:border .2s}
+.prompt-input:focus{border-color:var(--accent)}
+.prompt-input::placeholder{color:var(--text3)}
+
+/* GENERATE BUTTON */
+.generate-btn{width:100%;background:linear-gradient(135deg,var(--accent),#3b82f6);border:none;color:#fff;padding:14px;border-radius:var(--radius);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .3s;position:relative;overflow:hidden;letter-spacing:.3px}
+.generate-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 25px rgba(139,92,246,0.4)}
+.generate-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+.generate-btn .btn-glow{position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.15),transparent);opacity:0;transition:.2s}
+.generate-btn:hover .btn-glow{opacity:1}
+
+/* RESULT AREA */
+.result-area{padding:20px;border-bottom:1px solid var(--border)}
+.result-placeholder{border:1px dashed var(--border);border-radius:var(--radius);aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--text3);font-size:13px}
+.result-img-wrap{position:relative;border-radius:var(--radius);overflow:hidden;background:repeating-conic-gradient(#1a1f35 0% 25%,#13162a 0% 50%) 0 0/20px 20px;border:1px solid var(--border)}
+.result-img-wrap img{display:block;width:100%;height:auto}
+.result-actions{display:flex;gap:8px;margin-top:10px}
+.action-btn{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text2);padding:8px;border-radius:var(--radius2);font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .2s;text-align:center}
+.action-btn:hover{border-color:var(--accent);color:var(--accent2);background:rgba(139,92,246,0.1)}
+.action-btn.primary{background:rgba(16,185,129,0.15);border-color:var(--green);color:var(--green)}
+.action-btn.primary:hover{background:rgba(16,185,129,0.25)}
+
+/* ASSET LIBRARY */
+.library{padding:20px 28px;border-top:1px solid var(--border)}
+.library-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.lib-title{font-size:15px;font-weight:700}
+.lib-count{background:var(--surface2);color:var(--text2);font-size:11px;padding:3px 8px;border-radius:20px}
+.lib-actions{display:flex;gap:8px}
+.lib-btn{background:var(--surface);border:1px solid var(--border);color:var(--text2);padding:6px 14px;border-radius:var(--radius2);font-size:12px;cursor:pointer;font-family:inherit;transition:all .2s}
+.lib-btn:hover{border-color:var(--accent);color:var(--accent2)}
+.lib-btn.export{background:rgba(139,92,246,0.15);border-color:var(--accent);color:var(--accent2)}
+.asset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:12px}
+.asset-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:all .2s;position:relative}
+.asset-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,0.3)}
+.asset-card.selected-for-export{border-color:var(--green);box-shadow:0 0 0 2px rgba(16,185,129,0.3)}
+.asset-thumb{background:repeating-conic-gradient(#1e2438 0% 25%,#13162a 0% 50%) 0 0/16px 16px;padding:10px;display:flex;align-items:center;justify-content:center;min-height:90px}
+.asset-thumb img{max-width:80px;max-height:80px;image-rendering:pixelated}
+.asset-info{padding:8px;border-top:1px solid var(--border)}
+.asset-name{font-size:10px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.asset-meta{font-size:9px;color:var(--text3);margin-top:2px}
+.asset-check{position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:50%;background:var(--green);display:none;align-items:center;justify-content:center;font-size:10px;color:#fff}
+.asset-card.selected-for-export .asset-check{display:flex}
+.empty-lib{text-align:center;padding:48px 20px;color:var(--text3);font-size:13px}
+.empty-lib .icon{font-size:40px;margin-bottom:12px;display:block;opacity:.4}
+
+/* LOADING */
+.loading-overlay{position:fixed;inset:0;background:rgba(13,15,26,0.85);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:20px;display:none}
+.loading-overlay.visible{display:flex}
+.loader{width:56px;height:56px;border:3px solid var(--surface2);border-top-color:var(--accent2);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:14px;color:var(--text2);text-align:center}
+.loading-sub{font-size:12px;color:var(--text3)}
+
+/* TOAST */
+.toast-container{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:12px 18px;border-radius:var(--radius2);font-size:13px;animation:fadeIn .3s ease;box-shadow:0 8px 24px rgba(0,0,0,0.4)}
+.toast.success{border-color:var(--green);background:rgba(16,185,129,0.1)}
+.toast.error{border-color:var(--red);background:rgba(239,68,68,0.1)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);z-index:500;display:none;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:var(--bg3);border:1px solid var(--border2);border-radius:16px;padding:28px;max-width:560px;width:90%;max-height:80vh;overflow-y:auto}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:20px}
+.modal-close{float:right;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1}
+.spritesheet-preview{border-radius:8px;overflow:hidden;background:repeating-conic-gradient(#1e2438 0% 25%,#13162a 0% 50%) 0 0/12px 12px;padding:12px;margin-bottom:16px;text-align:center}
+.spritesheet-preview img{max-width:100%;border-radius:4px}
+.modal-actions{display:flex;gap:10px;margin-top:16px}
+.modal-btn{flex:1;padding:10px;border-radius:var(--radius2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border:none;transition:all .2s}
+.modal-btn.dl{background:linear-gradient(135deg,var(--accent),#3b82f6);color:#fff}
+.modal-btn.dl:hover{opacity:.9}
+.modal-btn.cancel{background:var(--surface);border:1px solid var(--border);color:var(--text2)}
+.json-code{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:monospace;font-size:10px;color:var(--text2);max-height:150px;overflow-y:auto;white-space:pre;margin-bottom:12px}
+
+@media(max-width:800px){
+  .main{grid-template-columns:1fr;grid-template-rows:auto auto}
+  .left{border-right:none;border-bottom:1px solid var(--border)}
+  .style-grid{grid-template-columns:repeat(3,1fr)}
+  .asset-grid{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))}
+}
+
+.bg-method-opt {
+  display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:var(--radius2);
+  border:1px solid var(--border);cursor:pointer;transition:all .2s;
+}
+.bg-method-opt:hover { border-color:var(--accent);background:rgba(139,92,246,0.06) }
+.bg-method-opt input[type=radio] { margin-top:2px;accent-color:var(--accent);flex-shrink:0 }
+.bg-method-opt:has(input:checked) { border-color:var(--accent);background:rgba(139,92,246,0.1) }
+.bg-opt-body { display:flex;flex-direction:column;gap:2px }
+.bg-opt-title { font-size:12px;font-weight:600;color:var(--text) }
+.bg-opt-desc { font-size:10px;color:var(--text3) }
+details summary::-webkit-details-marker { display:none }
+</style>
 </head>
 <body>
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loader"></div>
+  <div class="loading-text">🎨 AI sedang generate asset...</div>
+  <div class="loading-sub" id="loadingSub">Memproses sketsa → background removal → resize grid</div>
+</div>
+<div class="toast-container" id="toastContainer"></div>
 
-    <h1>AI Sketch to Image</h1>
+<!-- MODAL SPRITE SHEET -->
+<div class="modal-bg" id="sheetModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title">📦 Export Sprite Sheet</div>
+    <div class="spritesheet-preview"><img id="sheetPreviewImg" src="" alt="Sprite Sheet Preview"></div>
+    <div class="json-code" id="jsonPreview"></div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeModal()">Batal</button>
+      <button class="modal-btn dl" onclick="downloadZip()">⬇ Download ZIP (PNG + JSON)</button>
+    </div>
+  </div>
+</div>
 
-    <div class="container">
-        <div class="panel">
-            <h3>Kanvas Gambar</h3>
-            <canvas id="sketchCanvas" width="512" height="512"></canvas>
-            
-            <div class="controls">
-                <button onclick="clearCanvas()">Hapus Kanvas</button>
-                <input type="color" id="colorPicker" value="#000000">
-                <input type="range" id="brushSize" min="1" max="20" value="5">
-            </div>
+<nav class="nav">
+  <div class="nav-logo">sketch<span style="color:#60a5fa">AI</span></div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="api-status"><div class="dot"></div><span>Gemini 2.0 Flash</span></div>
+    <div class="nav-badge">MVP</div>
+  </div>
+  <div class="nav-right">
+    <span style="font-size:12px;color:var(--text3)" id="projectDescriptor"></span>
+    <button class="tool-btn" onclick="clearProject()" title="Reset project & locked style">🔄 New Project</button>
+  </div>
+</nav>
 
-            <input type="text" id="promptInput" placeholder="Contoh: Jadikan mobil sport cyberpunk 3D yang realistis">
-            
-            <div style="margin-top: 15px;">
-                <button id="generateBtn" onclick="generateImage()">Generate AI Image</button>
-            </div>
+<div class="main">
+  <!-- LEFT: Canvas -->
+  <div class="left">
+    <div class="canvas-area">
+      <div class="canvas-header">
+        <span class="canvas-title">Sketch Canvas</span>
+        <div class="canvas-tools">
+          <button class="tool-btn active" id="penBtn" onclick="setTool('pen')">✏️ Pen</button>
+          <button class="tool-btn" id="eraserBtn" onclick="setTool('eraser')">🧹 Eraser</button>
+          <button class="tool-btn" onclick="undo()">↩ Undo</button>
+          <button class="tool-btn" onclick="clearCanvas()">🗑 Clear</button>
         </div>
-
-        <div class="panel" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 512px;">
-            <h3>Hasil Generation</h3>
-            <span id="loadingText" style="display: none; color: #007bff; font-weight: bold;">AI sedang berpikir... (bisa butuh beberapa detik)</span>
-            <img id="resultImage" alt="Hasil AI akan muncul di sini">
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="sketchCanvas" width="512" height="512"></canvas>
+      </div>
+      <div class="brush-controls">
+        <div class="brush-ctrl">
+          <span>Color</span>
+          <input type="color" id="colorPicker" value="#000000">
         </div>
+        <div class="brush-ctrl">
+          <span>Size</span>
+          <input type="range" id="brushSize" min="1" max="30" value="4">
+          <span id="brushSizeLabel">4</span>
+        </div>
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+          📁 Upload gambar sketsa
+          <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleUpload(event)">
+        </button>
+      </div>
     </div>
 
-    <script>
-        // --- LOGIKA KANVAS GAMBAR ---
-        const canvas = document.getElementById('sketchCanvas');
-        const ctx = canvas.getContext('2d');
-        let isDrawing = false;
+    <!-- ASSET LIBRARY -->
+    <div class="library">
+      <div class="library-header">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="lib-title">Asset Library</span>
+          <span class="lib-count" id="assetCount">0 assets</span>
+        </div>
+        <div class="lib-actions">
+          <button class="lib-btn" onclick="clearLibrary()">🗑 Clear</button>
+          <button class="lib-btn export" id="exportSheetBtn" onclick="openExportModal()">📦 Export Sprite Sheet</button>
+        </div>
+      </div>
+      <div id="assetGrid" class="asset-grid">
+        <div class="empty-lib">
+          <span class="icon">🎮</span>
+          Asset yang kamu generate akan muncul di sini.<br>Mulai dengan gambar sketsa di atas!
+        </div>
+      </div>
+    </div>
+  </div>
 
-        // Isi kanvas dengan warna putih agar AI tidak membaca background transparan menjadi hitam
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+  <!-- RIGHT: Controls -->
+  <div class="right">
+    <div class="right-section">
+      <div class="section-label">Art Style</div>
+      <div class="style-grid" id="styleGrid">
+        <div class="style-card selected" data-key="cartoon_casual" onclick="selectStyle(this)">
+          <span class="style-emoji">🎨</span>
+          <div class="style-name">Cartoon Casual</div>
+        </div>
+        <div class="style-card" data-key="pixel_fantasy" onclick="selectStyle(this)">
+          <span class="style-emoji">⚔️</span>
+          <div class="style-name">Pixel Fantasy</div>
+        </div>
+        <div class="style-card" data-key="dark_dungeon" onclick="selectStyle(this)">
+          <span class="style-emoji">🌑</span>
+          <div class="style-name">Dark Dungeon</div>
+        </div>
+        <div class="style-card" data-key="flat_vector" onclick="selectStyle(this)">
+          <span class="style-emoji">🔷</span>
+          <div class="style-name">Flat Vector</div>
+        </div>
+        <div class="style-card" data-key="chibi_anime" onclick="selectStyle(this)">
+          <span class="style-emoji">🌸</span>
+          <div class="style-name">Chibi Anime</div>
+        </div>
+      </div>
+    </div>
 
-        // Event listener untuk mouse
-        canvas.addEventListener('mousedown', startDrawing);
-        canvas.addEventListener('mousemove', draw);
-        canvas.addEventListener('mouseup', stopDrawing);
-        canvas.addEventListener('mouseout', stopDrawing);
+    <div class="right-section">
+      <div class="section-label">Asset Type</div>
+      <div class="type-row">
+        <button class="type-btn selected" data-type="character" onclick="selectType(this)">👤 Character</button>
+        <button class="type-btn" data-type="item" onclick="selectType(this)">🗡 Item</button>
+        <button class="type-btn" data-type="environment" onclick="selectType(this)">🌲 Environment</button>
+        <button class="type-btn" data-type="tile" onclick="selectType(this)">🔲 Tile</button>
+      </div>
+    </div>
 
-        function startDrawing(e) {
-            isDrawing = true;
-            draw(e);
-        }
+    <div class="right-section">
+      <div class="section-label">Output Size (px)</div>
+      <div class="size-row">
+        <button class="size-btn" data-size="16" onclick="selectSize(this)">16</button>
+        <button class="size-btn" data-size="32" onclick="selectSize(this)">32</button>
+        <button class="size-btn selected" data-size="64" onclick="selectSize(this)">64</button>
+        <button class="size-btn" data-size="128" onclick="selectSize(this)">128</button>
+        <button class="size-btn" data-size="256" onclick="selectSize(this)">256</button>
+      </div>
+      <p style="font-size:10px;color:var(--text3);margin-top:8px">Output akan di-resize + center + padding otomatis ke ukuran grid ini</p>
+    </div>
 
-        function draw(e) {
-            if (!isDrawing) return;
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+    <div class="right-section">
+      <div class="section-label">Extra Instructions (opsional)</div>
+      <textarea class="prompt-input" id="extraPrompt" rows="3" placeholder="Contoh: buat versi dengan armor merah, tambahkan sayap, buat lebih gelap..."></textarea>
+    </div>
 
-            ctx.lineWidth = document.getElementById('brushSize').value;
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = document.getElementById('colorPicker').value;
 
-            ctx.lineTo(x, y);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-        }
+    <div class="right-section">
+      <details id="advancedPanel" style="cursor:pointer">
+        <summary style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;list-style:none;display:flex;align-items:center;justify-content:space-between">
+          <span>⚙️ Advanced Settings</span>
+          <span style="font-size:10px;color:var(--text3)" id="advSummaryText">Auto (rembg)</span>
+        </summary>
+        <div style="margin-top:14px">
+          <div class="section-label" style="margin-bottom:8px">Background Removal Method</div>
+          <div style="display:flex;flex-direction:column;gap:6px" id="bgMethodGroup">
+            <label class="bg-method-opt" data-v="auto">
+              <input type="radio" name="bgMethod" value="auto" checked>
+              <span class="bg-opt-body">
+                <span class="bg-opt-title">🤖 Auto (Rekomendasi)</span>
+                <span class="bg-opt-desc">rembg AI jika tersedia, fallback flood-fill ±15</span>
+              </span>
+            </label>
+            <label class="bg-method-opt" data-v="rembg">
+              <input type="radio" name="bgMethod" value="rembg">
+              <span class="bg-opt-body">
+                <span class="bg-opt-title">✨ rembg AI only</span>
+                <span class="bg-opt-desc">Akurat, handles semua warna bg, clean edge</span>
+              </span>
+            </label>
+            <label class="bg-method-opt" data-v="ff15">
+              <input type="radio" name="bgMethod" value="ff15">
+              <span class="bg-opt-body">
+                <span class="bg-opt-title">🔵 Flood-fill ±15 (Konservatif)</span>
+                <span class="bg-opt-desc">Aman untuk detail terang. Mungkin ada halo tipis</span>
+              </span>
+            </label>
+            <label class="bg-method-opt" data-v="ff30">
+              <input type="radio" name="bgMethod" value="ff30">
+              <span class="bg-opt-body">
+                <span class="bg-opt-title">🟡 Flood-fill ±30 (Sedang)</span>
+                <span class="bg-opt-desc">Seimbang. Untuk bg berwarna abu/berwarna</span>
+              </span>
+            </label>
+            <label class="bg-method-opt" data-v="ff40">
+              <input type="radio" name="bgMethod" value="ff40">
+              <span class="bg-opt-body">
+                <span class="bg-opt-title">🔴 Flood-fill ±40 (Agresif)</span>
+                <span class="bg-opt-desc">Hapus lebih banyak. Risiko hapus detail terang</span>
+              </span>
+            </label>
+            <label class="bg-method-opt" data-v="none">
+              <input type="radio" name="bgMethod" value="none">
+              <span class="bg-opt-body">
+                <span class="bg-opt-title">⬛ Tidak Hapus BG</span>
+                <span class="bg-opt-desc">Output mentah dari Gemini, background tetap ada</span>
+              </span>
+            </label>
+          </div>
+        </div>
+      </details>
+    </div>
+    <div class="right-section">
+      <button class="generate-btn" id="generateBtn" onclick="generateAsset()">
+        <div class="btn-glow"></div>
+        ✨ Generate Asset
+      </button>
+      <button class="generate-btn" id="animBtn" style="margin-top:8px;background:linear-gradient(135deg,#7c3aed,#be185d)" onclick="openAnimModal()">
+        🎬 Generate Animation Frames
+      </button>
+      <button class="generate-btn" id="variationBtn" style="margin-top:8px;background:linear-gradient(135deg,#0f766e,#0891b2)" onclick="generateVariation()" disabled>
+        🔀 Generate Variasi dari Hasil Ini
+      </button>
+    </div>
 
-        function stopDrawing() {
-            isDrawing = false;
-            ctx.beginPath();
-        }
+    <!-- RESULT -->
+    <div class="result-area" id="resultArea">
+      <div class="section-label" style="margin-bottom:12px">Generated Asset</div>
+      <div class="result-placeholder" id="resultPlaceholder">
+        <span style="font-size:32px">🖼</span>
+        <span>Hasil generate akan muncul di sini</span>
+        <span style="font-size:10px">Transparent PNG • Grid-sized</span>
+      </div>
+      <div id="resultImgWrap" style="display:none">
+        <div class="result-img-wrap">
+          <img id="resultImage" src="" alt="Generated Asset">
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:6px;text-align:center" id="resultMeta"></div>
+        <div class="result-actions">
+          <button class="action-btn" onclick="downloadSingle()">⬇ Download PNG</button>
+          <button class="action-btn primary" onclick="saveToLibrary()">✚ Simpan ke Library</button>
+        </div>
+        <div style="margin-top:10px">
+          <div class="section-label" style="margin-bottom:6px;font-size:9px">Raw AI Output (sebelum post-process)</div>
+          <div style="border-radius:8px;overflow:hidden;background:repeating-conic-gradient(#1e2438 0% 25%,#13162a 0% 50%) 0 0/10px 10px">
+            <img id="rawImage" src="" alt="Raw" style="width:100%;max-height:120px;object-fit:contain">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const API = 'http://127.0.0.1:8000';
 
-        function clearCanvas() {
-            ctx.fillStyle = "white";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            document.getElementById('resultImage').style.display = 'none';
-        }
+// State
+let state = {
+  tool: 'pen',
+  style: 'cartoon_casual',
+  assetType: 'character',
+  size: 64,
+  lockedDescriptor: '',
+  assets: JSON.parse(localStorage.getItem('sketchai_assets') || '[]'),
+  lastResult: null,
+  lastRaw: null,
+  selectedForExport: new Set(),
+  undoStack: [],
+  zipData: null,
+};
 
-        // --- LOGIKA MENGIRIM KE BACKEND FASTAPI ---
-        async function generateImage() {
-            const prompt = document.getElementById('promptInput').value;
-            const generateBtn = document.getElementById('generateBtn');
-            const loadingText = document.getElementById('loadingText');
-            const resultImage = document.getElementById('resultImage');
+// Canvas setup
+const canvas = document.getElementById('sketchCanvas');
+const ctx = canvas.getContext('2d');
+let isDrawing = false, lastX = 0, lastY = 0;
 
-            if (!prompt) {
-                alert("Masukkan instruksi prompt terlebih dahulu!");
-                return;
-            }
+ctx.fillStyle = '#ffffff';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+saveUndo();
 
-            // 1. Ambil gambar dari kanvas sebagai Base64
-            const base64Image = canvas.toDataURL('image/png');
+function getPos(e) {
+  const r = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / r.width;
+  const scaleY = canvas.height / r.height;
+  if (e.touches) {
+    return {x:(e.touches[0].clientX-r.left)*scaleX, y:(e.touches[0].clientY-r.top)*scaleY};
+  }
+  return {x:(e.clientX-r.left)*scaleX, y:(e.clientY-r.top)*scaleY};
+}
 
-            // 2. Ubah status UI menjadi Loading
-            generateBtn.disabled = true;
-            loadingText.style.display = 'block';
-            resultImage.style.display = 'none';
+function startDraw(e) {
+  e.preventDefault();
+  isDrawing = true;
+  const p = getPos(e);
+  lastX = p.x; lastY = p.y;
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+}
+function draw(e) {
+  e.preventDefault();
+  if (!isDrawing) return;
+  const p = getPos(e);
+  ctx.lineWidth = document.getElementById('brushSize').value;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (state.tool === 'eraser') {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.strokeStyle = 'rgba(255,255,255,1)';
+  } else {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = document.getElementById('colorPicker').value;
+  }
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y);
+  lastX = p.x; lastY = p.y;
+}
+function stopDraw() {
+  if (isDrawing) { saveUndo(); }
+  isDrawing = false;
+  ctx.globalCompositeOperation = 'source-over';
+}
 
-            try {
-                // 3. Kirim POST request ke FastAPI Backend-mu
-                const response = await fetch('http://127.0.0.1:8000/api/generate-from-sketch', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        image: base64Image,
-                        prompt: prompt
-                    })
-                });
+canvas.addEventListener('mousedown', startDraw);
+canvas.addEventListener('mousemove', draw);
+canvas.addEventListener('mouseup', stopDraw);
+canvas.addEventListener('mouseout', stopDraw);
+canvas.addEventListener('touchstart', startDraw, {passive:false});
+canvas.addEventListener('touchmove', draw, {passive:false});
+canvas.addEventListener('touchend', stopDraw);
 
-                if (!response.ok) {
-                    throw new Error("Gagal mengambil respons dari server");
-                }
+document.getElementById('brushSize').addEventListener('input', function() {
+  document.getElementById('brushSizeLabel').textContent = this.value;
+});
 
-                const data = await response.json();
+function saveUndo() {
+  state.undoStack.push(canvas.toDataURL());
+  if (state.undoStack.length > 20) state.undoStack.shift();
+}
+function undo() {
+  if (state.undoStack.length <= 1) return;
+  state.undoStack.pop();
+  const img = new Image();
+  img.onload = () => { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img,0,0); };
+  img.src = state.undoStack[state.undoStack.length-1];
+}
+function clearCanvas() {
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  saveUndo();
+}
+function handleUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      ctx.fillStyle='#fff'; ctx.fillRect(0,0,512,512);
+      const s = Math.min(512/img.width, 512/img.height);
+      const w = img.width*s, h = img.height*s;
+      ctx.drawImage(img,(512-w)/2,(512-h)/2,w,h);
+      saveUndo();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
 
-                // 4. Tampilkan gambar balasan dari AI
-                if (data.status === "success") {
-                    resultImage.src = data.generated_image;
-                    resultImage.style.display = 'block';
-                }
+// Tool selection
+function setTool(t) {
+  state.tool = t;
+  document.getElementById('penBtn').classList.toggle('active', t==='pen');
+  document.getElementById('eraserBtn').classList.toggle('active', t==='eraser');
+}
+function selectStyle(el) {
+  document.querySelectorAll('.style-card').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.style = el.dataset.key;
+}
+function selectType(el) {
+  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected');
+  state.assetType = el.dataset.type;
+}
+function selectSize(el) {
+  document.querySelectorAll('.size-btn').forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected');
+  state.size = parseInt(el.dataset.size);
+}
 
-            } catch (error) {
-                console.error("Error:", error);
-                alert("Terjadi kesalahan! Pastikan server FastAPI sedang berjalan.");
-            } finally {
-                // 5. Kembalikan status UI
-                generateBtn.disabled = false;
-                loadingText.style.display = 'none';
-            }
-        }
-    </script>
+// Toast
+function toast(msg, type='info') {
+  const tc = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  tc.appendChild(t);
+  setTimeout(()=>t.remove(), 3500);
+}
+
+// Loading
+function setLoading(v, sub='') {
+  const o = document.getElementById('loadingOverlay');
+  o.classList.toggle('visible', v);
+  if (sub) document.getElementById('loadingSub').textContent = sub;
+}
+
+// GENERATE
+async function generateAsset() {
+  setLoading(true, 'Mengirim sketsa ke Gemini 2.0 Flash Image...');
+  document.getElementById('generateBtn').disabled = true;
+  document.getElementById('variationBtn').disabled = true;
+  try {
+    const base64 = canvas.toDataURL('image/png');
+    const body = {
+      image: base64,
+      style_key: state.style,
+      asset_type: state.assetType,
+      target_size: state.size,
+      locked_descriptor: state.lockedDescriptor,
+      extra_prompt: document.getElementById('extraPrompt').value,
+      bg_method: getBgMethod()
+    };
+    const res = await fetch(API+'/api/generate', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if (!res.ok) { const e=await res.json(); throw new Error(e.detail||'Server error'); }
+    const data = await res.json();
+    state.lastResult = data.image;
+    state.lastRaw = data.raw_image;
+    if (!state.lockedDescriptor && data.locked_descriptor) {
+      state.lockedDescriptor = data.locked_descriptor;
+      document.getElementById('projectDescriptor').textContent = '🔒 Style locked';
+    }
+    showResult(data);
+    toast('Asset berhasil di-generate! 🎉', 'success');
+  } catch(err) {
+    toast('Error: '+err.message, 'error');
+    console.error(err);
+  } finally {
+    setLoading(false);
+    document.getElementById('generateBtn').disabled = false;
+    document.getElementById('variationBtn').disabled = !state.lastResult;
+  }
+}
+
+async function generateVariation() {
+  if (!state.lastResult) { toast('Generate asset dulu!', 'error'); return; }
+  const extra = document.getElementById('extraPrompt').value || 'create an alternative color variant';
+  setLoading(true, 'Generating variasi dari asset sebelumnya...');
+  document.getElementById('generateBtn').disabled = true;
+  document.getElementById('variationBtn').disabled = true;
+  try {
+    const body = {
+      image: state.lastResult,
+      style_key: state.style,
+      asset_type: state.assetType,
+      target_size: state.size,
+      locked_descriptor: state.lockedDescriptor,
+      extra_prompt: extra,
+      bg_method: getBgMethod()
+    };
+    const res = await fetch(API+'/api/generate-variation', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if (!res.ok) { const e=await res.json(); throw new Error(e.detail||'Server error'); }
+    const data = await res.json();
+    state.lastResult = data.image;
+    state.lastRaw = data.image;
+    showResult(data);
+    toast('Variasi berhasil dibuat! 🎨', 'success');
+  } catch(err) {
+    toast('Error: '+err.message, 'error');
+  } finally {
+    setLoading(false);
+    document.getElementById('generateBtn').disabled = false;
+    document.getElementById('variationBtn').disabled = false;
+  }
+}
+
+function showResult(data) {
+  document.getElementById('resultPlaceholder').style.display = 'none';
+  const wrap = document.getElementById('resultImgWrap');
+  wrap.style.display = 'block';
+  document.getElementById('resultImage').src = data.image;
+  if (data.raw_image) document.getElementById('rawImage').src = data.raw_image;
+  document.getElementById('resultMeta').textContent = (data.filename||'') + ' • ' + (data.size||state.size) + 'x' + (data.size||state.size) + 'px • Transparent PNG';
+}
+
+function downloadSingle() {
+  if (!state.lastResult) return;
+  const a = document.createElement('a');
+  a.href = state.lastResult;
+  const ts = Date.now();
+  a.download = state.assetType+'_'+state.style+'_'+state.size+'x'+state.size+'_'+ts+'.png';
+  a.click();
+  toast('PNG downloaded!', 'success');
+}
+
+function saveToLibrary() {
+  if (!state.lastResult) return;
+  const asset = {
+    id: Date.now(),
+    image: state.lastResult,
+    name: state.assetType+'_'+state.style+'_'+state.size,
+    type: state.assetType,
+    style: state.style,
+    size: state.size,
+    createdAt: new Date().toISOString()
+  };
+  state.assets.unshift(asset);
+  localStorage.setItem('sketchai_assets', JSON.stringify(state.assets));
+  renderLibrary();
+  toast('Asset disimpan ke Library! ✅', 'success');
+}
+
+function renderLibrary() {
+  const grid = document.getElementById('assetGrid');
+  document.getElementById('assetCount').textContent = state.assets.length + ' assets';
+  if (state.assets.length === 0) {
+    grid.innerHTML = '<div class="empty-lib"><span class="icon">🎮</span>Asset yang kamu generate akan muncul di sini.<br>Mulai dengan gambar sketsa di atas!</div>';
+    return;
+  }
+  grid.innerHTML = state.assets.map(a => `
+    <div class="asset-card ${state.selectedForExport.has(a.id)?'selected-for-export':''}" 
+         id="asset-${a.id}" onclick="toggleExportSelect(${a.id})" title="${a.name}">
+      <div class="asset-check">✓</div>
+      <div class="asset-thumb"><img src="${a.image}" alt="${a.name}"></div>
+      <div class="asset-info">
+        <div class="asset-name">${a.name}</div>
+        <div class="asset-meta">${a.size}x${a.size}px • ${a.type}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleExportSelect(id) {
+  if (state.selectedForExport.has(id)) state.selectedForExport.delete(id);
+  else state.selectedForExport.add(id);
+  renderLibrary();
+  document.getElementById('exportSheetBtn').textContent = 
+    state.selectedForExport.size > 0 
+      ? `📦 Export ${state.selectedForExport.size} Assets` 
+      : '📦 Export Sprite Sheet';
+}
+
+function clearLibrary() {
+  if (!confirm('Hapus semua asset dari library?')) return;
+  state.assets = [];
+  state.selectedForExport.clear();
+  localStorage.removeItem('sketchai_assets');
+  renderLibrary();
+}
+
+function clearProject() {
+  if (!confirm('Reset project? Style lock akan direset.')) return;
+  state.lockedDescriptor = '';
+  document.getElementById('projectDescriptor').textContent = '';
+  toast('Project di-reset. Style descriptor tidak terkunci.', 'info');
+}
+
+async function openExportModal() {
+  const toExport = state.selectedForExport.size > 0
+    ? state.assets.filter(a => state.selectedForExport.has(a.id))
+    : state.assets;
+  if (toExport.length === 0) { toast('Tidak ada asset di Library!', 'error'); return; }
+  setLoading(true, 'Membuat sprite sheet...');
+  try {
+    const body = {
+      images: toExport.map(a => a.image),
+      names: toExport.map(a => a.name + '_' + a.id + '.png'),
+      columns: Math.min(4, toExport.length)
+    };
+    const res = await fetch(API+'/api/export-spritesheet', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if (!res.ok) { const e=await res.json(); throw new Error(e.detail||'Server error'); }
+    const data = await res.json();
+    document.getElementById('sheetPreviewImg').src = data.spritesheet;
+    document.getElementById('jsonPreview').textContent = JSON.stringify(data.metadata, null, 2).substring(0, 800) + '...';
+    state.zipData = data.zip;
+    setLoading(false);
+    document.getElementById('sheetModal').classList.add('open');
+  } catch(err) {
+    setLoading(false);
+    toast('Error: '+err.message, 'error');
+  }
+}
+
+function downloadZip() {
+  if (!state.zipData) return;
+  const a = document.createElement('a');
+  a.href = state.zipData;
+  a.download = 'sketchai_spritesheet_' + Date.now() + '.zip';
+  a.click();
+  toast('ZIP downloaded! (PNG + JSON metadata)', 'success');
+}
+
+function closeModal() {
+  document.getElementById('sheetModal').classList.remove('open');
+}
+
+
+// ── Advanced: BG Method ──────────────────────────────────────
+const BG_METHOD_LABELS = {
+  auto:  'Auto (rembg)',
+  rembg: 'rembg AI only',
+  ff15:  'Flood-fill ±15',
+  ff30:  'Flood-fill ±30',
+  ff40:  'Flood-fill ±40',
+  none:  'Tidak hapus BG',
+};
+
+function getBgMethod() {
+  const checked = document.querySelector('input[name="bgMethod"]:checked');
+  return checked ? checked.value : 'auto';
+}
+
+// Update summary text when option changes
+document.querySelectorAll('input[name="bgMethod"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    document.getElementById('advSummaryText').textContent = BG_METHOD_LABELS[radio.value] || radio.value;
+  });
+});
+// Init
+renderLibrary();
+
+// ============================================================
+// ANIMATION FEATURE
+// ============================================================
+let animState = {
+  type: null,
+  fps: 8,
+  frames: [],
+  frameNames: [],
+  zipData: null,
+  stripImg: null,
+  metadata: null,
+  playerInterval: null,
+  currentFrame: 0,
+  isPlaying: false,
+};
+let animDefs = [];
+
+// Load animation definitions from API
+async function loadAnimDefs() {
+  try {
+    const res = await fetch(API + '/api/animations');
+    const data = await res.json();
+    animDefs = data.animations;
+    renderAnimTypeGrid();
+  } catch(e) { console.error('Failed to load anim defs', e); }
+}
+
+function renderAnimTypeGrid() {
+  const grid = document.getElementById('animTypeGrid');
+  if (!grid) return;
+  const presetCards = animDefs.map(a => `
+    <div class="style-card" data-anim="${a.key}" onclick="selectAnimType(this,'${a.key}')"
+         title="${a.description}">
+      <span class="style-emoji">${a.emoji}</span>
+      <div class="style-name">${a.name}</div>
+      <div style="font-size:9px;color:var(--text3);margin-top:2px">${a.frame_count} frames • ${a.recommended_fps} fps</div>
+    </div>
+  `).join('');
+  // Custom card always appended last
+  const customCard = `
+    <div class="style-card" data-anim="custom" onclick="selectAnimType(this,'custom')"
+         title="Buat animasi sesuai deskripsimu sendiri">
+      <span class="style-emoji">✨</span>
+      <div class="style-name">Custom</div>
+      <div style="font-size:9px;color:var(--accent2);margin-top:2px">Deskripsi bebas</div>
+    </div>`;
+  grid.innerHTML = presetCards + customCard;
+}
+
+function openAnimModal() {
+  animState.type = null;
+  document.getElementById('startAnimBtn').disabled = true;
+  document.getElementById('animInfo').style.display = 'none';
+  document.getElementById('customAnimSection').style.display = 'none';
+  document.getElementById('customAnimDesc').value = '';
+  document.querySelectorAll('#animTypeGrid .style-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('animModal').classList.add('open');
+}
+function closeAnimModal() {
+  document.getElementById('animModal').classList.remove('open');
+}
+function closeAnimResult() {
+  stopPlayer();
+  document.getElementById('animResultModal').classList.remove('open');
+}
+
+function selectAnimType(el, key) {
+  document.querySelectorAll('#animTypeGrid .style-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  animState.type = key;
+  const customSection = document.getElementById('customAnimSection');
+
+  if (key === 'custom') {
+    customSection.style.display = 'block';
+    document.getElementById('animInfo').style.display = 'none';
+    animState.customFrameCount = animState.customFrameCount || 6;
+    document.getElementById('startAnimBtn').disabled = false;
+    document.getElementById('startAnimBtn').textContent = '🎬 Generate Custom Animation';
+  } else {
+    customSection.style.display = 'none';
+    const def = animDefs.find(a => a.key === key);
+    if (def) {
+      const secs = def.frame_count * 8;
+      document.getElementById('animInfoText').innerHTML =
+        `<strong>${def.name}</strong> — ${def.frame_count} frames • Recommended: ${def.recommended_fps} fps<br>
+         <span style="color:var(--text3)">${def.description}</span><br>
+         <span style="color:var(--yellow)">⏱ Estimasi waktu generate: ~${secs}–${secs*2} detik</span>`;
+      document.getElementById('animInfo').style.display = 'block';
+      animState.fps = def.recommended_fps;
+      document.querySelectorAll('#fpsRow .size-btn').forEach(b => {
+        b.classList.toggle('selected', parseInt(b.dataset.fps) === def.recommended_fps);
+      });
+    }
+    document.getElementById('startAnimBtn').disabled = false;
+    document.getElementById('startAnimBtn').textContent = '🎬 Generate Semua Frame';
+  }
+}
+
+function selectCustomFrames(el) {
+  document.querySelectorAll('#customFrameRow .size-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  animState.customFrameCount = parseInt(el.dataset.cf);
+  const secs = animState.customFrameCount * 8;
+  document.getElementById('customTimeEst').textContent = `~${secs}-${secs*2} det`;
+}
+
+function selectFps(el) {
+  document.querySelectorAll('#fpsRow .size-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  animState.fps = parseInt(el.dataset.fps);
+  if (animState.isPlaying) { stopPlayer(); startPlayer(); }
+}
+
+async function startAnimation() {
+  if (!animState.type) return;
+  closeAnimModal();
+  setLoading(true, `🎬 Generating ${animDefs.find(a=>a.key===animState.type)?.frame_count||'?'} frames... (harap tunggu, ini butuh beberapa menit)`);
+  document.getElementById('loadingSub').innerHTML =
+    'Setiap frame di-generate satu per satu untuk konsistensi style.<br>Jangan tutup halaman ini.';
+
+  try {
+    const isCustom = animState.type === 'custom';
+    const customDesc = document.getElementById('customAnimDesc')?.value?.trim() || '';
+    if (isCustom && !customDesc) {
+      toast('Tulis deskripsi animasimu dulu!', 'error');
+      openAnimModal(); return;
+    }
+    const body = {
+      image: canvas.toDataURL('image/png'),
+      style_key: state.style,
+      asset_type: state.assetType,
+      target_size: state.size,
+      animation_type: animState.type,
+      fps: animState.fps,
+      locked_descriptor: state.lockedDescriptor,
+      extra_prompt: '',
+      custom_description: customDesc,
+      custom_frame_count: animState.customFrameCount || 6,
+      bg_method: getBgMethod(),
+    };
+    const res = await fetch(API + '/api/generate-animation', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.detail||'Server error'); }
+    const data = await res.json();
+
+    animState.frames = data.frames;
+    animState.frameNames = data.frame_names;
+    animState.zipData = data.zip;
+    animState.stripImg = data.spritesheet;
+    animState.metadata = data.metadata;
+    animState.currentFrame = 0;
+
+    showAnimResult(data);
+    toast(`✅ ${data.total_frames} frame berhasil di-generate!`, 'success');
+  } catch(err) {
+    toast('Error: ' + err.message, 'error');
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function showAnimResult(data) {
+  const def = animDefs.find(a => a.key === animState.type);
+  document.getElementById('animResultTitle').textContent =
+    `🎬 ${def?.name||'Animation'} — ${data.total_frames} Frames @ ${data.fps} FPS`;
+
+  // Frame strip
+  const strip = document.getElementById('frameStrip');
+  strip.innerHTML = data.frames.map((f, i) => `
+    <div style="flex-shrink:0;text-align:center;cursor:pointer" onclick="jumpToFrame(${i})">
+      <div style="background:repeating-conic-gradient(#1e2438 0% 25%,#13162a 0% 50%) 0 0/10px 10px;border-radius:6px;padding:6px;border:1px solid var(--border)">
+        <img src="${f}" style="width:${Math.max(40,state.size)}px;height:${Math.max(40,state.size)}px;display:block;image-rendering:pixelated">
+      </div>
+      <div style="font-size:9px;color:var(--text3);margin-top:4px">F${i}</div>
+    </div>
+  `).join('');
+
+  document.getElementById('animStripImg').src = data.spritesheet;
+  document.getElementById('animMeta').textContent =
+    `Sprite size: ${state.size}×${state.size}px • FPS: ${data.fps} • Frames: ${data.total_frames} • Format: Godot/Phaser/Unity compatible`;
+
+  // Setup canvas preview
+  const pc = document.getElementById('animPreviewCanvas');
+  pc.width = state.size; pc.height = state.size;
+  pc.style.width = '128px'; pc.style.height = '128px';
+
+  animState.isPlaying = true;
+  startPlayer();
+  document.getElementById('playPauseBtn').textContent = '⏸ Pause';
+  document.getElementById('animResultModal').classList.add('open');
+}
+
+function startPlayer() {
+  stopPlayer();
+  const interval = Math.round(1000 / animState.fps);
+  animState.playerInterval = setInterval(() => {
+    animState.currentFrame = (animState.currentFrame + 1) % animState.frames.length;
+    renderFrame(animState.currentFrame);
+  }, interval);
+  animState.isPlaying = true;
+}
+function stopPlayer() {
+  if (animState.playerInterval) { clearInterval(animState.playerInterval); animState.playerInterval = null; }
+  animState.isPlaying = false;
+}
+function togglePlay() {
+  if (animState.isPlaying) {
+    stopPlayer();
+    document.getElementById('playPauseBtn').textContent = '▶ Play';
+  } else {
+    startPlayer();
+    document.getElementById('playPauseBtn').textContent = '⏸ Pause';
+  }
+}
+function stepFrame(dir) {
+  stopPlayer();
+  document.getElementById('playPauseBtn').textContent = '▶ Play';
+  animState.currentFrame = (animState.currentFrame + dir + animState.frames.length) % animState.frames.length;
+  renderFrame(animState.currentFrame);
+}
+function jumpToFrame(i) {
+  animState.currentFrame = i;
+  renderFrame(i);
+}
+function renderFrame(i) {
+  const pc = document.getElementById('animPreviewCanvas');
+  const pctx = pc.getContext('2d');
+  const img = new Image();
+  img.onload = () => {
+    pctx.clearRect(0, 0, pc.width, pc.height);
+    pctx.drawImage(img, 0, 0, pc.width, pc.height);
+  };
+  img.src = animState.frames[i];
+  document.getElementById('frameCounter').textContent =
+    `Frame ${i+1}/${animState.frames.length} • ${animState.fps} fps`;
+  // Highlight current frame in strip
+  document.querySelectorAll('#frameStrip > div').forEach((el, idx) => {
+    el.style.opacity = idx === i ? '1' : '0.5';
+    el.querySelector('div').style.borderColor = idx === i ? 'var(--accent)' : 'var(--border)';
+  });
+}
+
+function saveAllFramesToLibrary() {
+  animState.frames.forEach((img, i) => {
+    const asset = {
+      id: Date.now() + i,
+      image: img,
+      name: animState.frameNames[i]?.replace('.png','') || `anim_frame_${i}`,
+      type: state.assetType,
+      style: state.style,
+      size: state.size,
+      createdAt: new Date().toISOString(),
+    };
+    state.assets.unshift(asset);
+  });
+  localStorage.setItem('sketchai_assets', JSON.stringify(state.assets));
+  renderLibrary();
+  closeAnimResult();
+  toast(`✅ ${animState.frames.length} frames disimpan ke Library!`, 'success');
+}
+
+function downloadAnimZip() {
+  if (!animState.zipData) return;
+  const a = document.createElement('a');
+  a.href = animState.zipData;
+  a.download = `sketchai_${state.assetType}_${animState.type}_${Date.now()}.zip`;
+  a.click();
+  toast('ZIP downloaded! (Frames + Strip PNG + JSON)', 'success');
+}
+
+// Init animation defs on load
+loadAnimDefs();
+
+</script>
+
+<!-- ========== ANIMATION SETTINGS MODAL ========== -->
+<div class="modal-bg" id="animModal">
+  <div class="modal" style="max-width:680px">
+    <button class="modal-close" onclick="closeAnimModal()">✕</button>
+    <div class="modal-title">🎬 Generate Animation Frames</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:20px">Pilih jenis animasi dan FPS. Sistem akan generate semua frame secara otomatis dari sketsa kamu.</p>
+
+    <div class="section-label">Animation Type</div>
+    <div id="animTypeGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:20px"></div>
+    <!-- Custom Animation Section -->
+    <div id="customAnimSection" style="display:none;margin-bottom:20px">
+      <div class="section-label" style="margin-bottom:10px">✏️ Describe Your Custom Animation</div>
+      <textarea id="customAnimDesc" class="prompt-input" rows="3"
+        placeholder="Contoh: karakter melakukan gerakan sihir — kedua tangan terangkat ke atas, energi berkumpul di telapak tangan, bola api terbentuk, dilepaskan ke depan dengan dorongan kuat"
+        style="margin-bottom:10px;font-size:13px"></textarea>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:12px;color:var(--text2);white-space:nowrap">Jumlah frame:</span>
+        <div style="display:flex;gap:6px" id="customFrameRow">
+          <button class="size-btn" data-cf="4" onclick="selectCustomFrames(this)">4</button>
+          <button class="size-btn selected" data-cf="6" onclick="selectCustomFrames(this)">6</button>
+          <button class="size-btn" data-cf="8" onclick="selectCustomFrames(this)">8</button>
+          <button class="size-btn" data-cf="10" onclick="selectCustomFrames(this)">10</button>
+          <button class="size-btn" data-cf="12" onclick="selectCustomFrames(this)">12</button>
+        </div>
+        <span style="font-size:11px;color:var(--text3)" id="customTimeEst">~48-96 det</span>
+      </div>
+      <div style="margin-top:10px;background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.2);border-radius:8px;padding:10px;font-size:11px;color:var(--text2)">
+        💡 AI akan membaca deskripsimu dan secara otomatis membagi gerakan menjadi frame-by-frame pose sebelum generate gambar.
+      </div>
+    </div>
+
+    <div class="section-label">Playback FPS</div>
+    <div style="display:flex;gap:8px;margin-bottom:20px" id="fpsRow">
+      <button class="size-btn" data-fps="6" onclick="selectFps(this)">6 fps</button>
+      <button class="size-btn selected" data-fps="8" onclick="selectFps(this)">8 fps</button>
+      <button class="size-btn" data-fps="12" onclick="selectFps(this)">12 fps</button>
+      <button class="size-btn" data-fps="24" onclick="selectFps(this)">24 fps</button>
+    </div>
+
+    <div id="animInfo" style="background:rgba(139,92,246,0.08);border:1px solid var(--border2);border-radius:8px;padding:12px;margin-bottom:20px;font-size:12px;color:var(--text2);display:none">
+      <div id="animInfoText"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeAnimModal()">Batal</button>
+      <button class="modal-btn dl" id="startAnimBtn" onclick="startAnimation()" disabled>🎬 Generate Semua Frame</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== ANIMATION RESULT MODAL ========== -->
+<div class="modal-bg" id="animResultModal">
+  <div class="modal" style="max-width:800px">
+    <button class="modal-close" onclick="closeAnimResult()">✕</button>
+    <div class="modal-title" id="animResultTitle">🎬 Animation Frames</div>
+
+    <!-- Live preview player -->
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="display:inline-block;background:repeating-conic-gradient(#1e2438 0% 25%,#13162a 0% 50%) 0 0/16px 16px;border-radius:12px;padding:16px;border:1px solid var(--border)">
+        <canvas id="animPreviewCanvas" width="128" height="128" style="image-rendering:pixelated;border-radius:4px"></canvas>
+      </div>
+      <div style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:12px">
+        <button class="tool-btn" id="playPauseBtn" onclick="togglePlay()">⏸ Pause</button>
+        <span style="font-size:12px;color:var(--text2)" id="frameCounter">Frame 1/6</span>
+        <button class="tool-btn" onclick="stepFrame(-1)">⏮</button>
+        <button class="tool-btn" onclick="stepFrame(1)">⏭</button>
+      </div>
+    </div>
+
+    <!-- Frame strip -->
+    <div class="section-label">All Frames</div>
+    <div id="frameStrip" style="display:flex;gap:8px;overflow-x:auto;padding:12px;background:var(--bg);border-radius:8px;border:1px solid var(--border);margin-bottom:16px"></div>
+
+    <!-- Sprite strip preview -->
+    <div class="section-label" style="margin-bottom:8px">Sprite Strip (Game Engine Ready)</div>
+    <div style="background:repeating-conic-gradient(#1e2438 0% 25%,#13162a 0% 50%) 0 0/10px 10px;border-radius:8px;padding:10px;margin-bottom:16px;overflow-x:auto">
+      <img id="animStripImg" src="" style="display:block;height:80px;width:auto;image-rendering:pixelated">
+    </div>
+
+    <div style="font-size:10px;color:var(--text3);margin-bottom:12px" id="animMeta"></div>
+
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="saveAllFramesToLibrary()">📚 Simpan ke Library</button>
+      <button class="modal-btn dl" onclick="downloadAnimZip()">⬇ Download ZIP (Frames + Strip + JSON)</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
